@@ -56,7 +56,7 @@ SELECT
 	,ps.AdmittedDate
 	,ps.Tariff
 	,COUNT(*) OVER () AS TotalCount
-	-- create a window over the whole table
+-- create a window over the whole table
 FROM
 	PatientStay ps
 ORDER BY
@@ -92,26 +92,34 @@ SELECT
 	,ps.Tariff
 	,ps.Ward
 	,SUM(ps.Tariff) OVER () AS TotalTariff
-	,(SELECT SUM(ps2.Tariff)
-		FROM PatientStay ps2
-		WHERE ps2.Ward = ps.Ward) AS TotalTariff2
+	,(SELECT
+		SUM(ps2.Tariff)
+	FROM
+		PatientStay ps2
+	WHERE ps2.Ward = ps.Ward) AS TotalTariff2
 	,SUM(ps.Tariff) OVER (PARTITION BY ps.Ward) AS WardTariff
-	,(SELECT SUM(ps2.Tariff)
-		FROM PatientStay ps2
-		WHERE ps2.Ward = ps.Ward) AS WardTariff2
+	,(SELECT
+		SUM(ps2.Tariff)
+	FROM
+		PatientStay ps2
+	WHERE ps2.Ward = ps.Ward) AS WardTariff2
 	,100.0 * ps.Tariff / SUM(ps.Tariff) OVER () AS PctOfAllTariff
 	,100.0 * ps.Tariff / (
-		SELECT SUM(ps2.Tariff)
-		FROM PatientStay ps2
-		WHERE ps2.PatientId = ps.PatientId OR ps2.PatientId <> ps.PatientId
+		SELECT
+		SUM(ps2.Tariff)
+	FROM
+		PatientStay ps2
+	WHERE ps2.PatientId = ps.PatientId OR ps2.PatientId <> ps.PatientId
 	) AS PctOfAllTariff2
 	,100.0 * ps.Tariff / SUM(ps.Tariff) OVER (PARTITION BY ps.Ward) AS PctOfWardTariff
 	,100.0 * ps.Tariff / (
-		SELECT SUM(ps2.Tariff)
-		FROM PatientStay ps2
-		WHERE ps2.Ward = ps.Ward
+		SELECT
+		SUM(ps2.Tariff)
+	FROM
+		PatientStay ps2
+	WHERE ps2.Ward = ps.Ward
 	) AS PctOfWardTariff2
-    
+
 FROM
 	PatientStay ps
 ORDER BY
@@ -163,10 +171,10 @@ ORDER BY
 SELECT
 	ps.AdmittedDate
 	,ps.Tariff
-	-- ,ROW_NUMBER() OVER (ORDER BY ps.AdmittedDate) AS RowIndex
-	-- ,SUM(ps.Tariff) OVER (ORDER BY ps.AdmittedDate) AS RunningTariff
-	-- ,ROW_NUMBER() OVER (PARTITION BY DATENAME(MONTH,ps.AdmittedDate) ORDER BY ps.AdmittedDate) AS MonthIndex
-	-- ,SUM(ps.Tariff) OVER (PARTITION BY DATENAME(MONTH,ps.AdmittedDate) ORDER BY ps.AdmittedDate) AS MonthToDateTariff
+-- ,ROW_NUMBER() OVER (ORDER BY ps.AdmittedDate) AS RowIndex
+-- ,SUM(ps.Tariff) OVER (ORDER BY ps.AdmittedDate) AS RunningTariff
+-- ,ROW_NUMBER() OVER (PARTITION BY DATENAME(MONTH,ps.AdmittedDate) ORDER BY ps.AdmittedDate) AS MonthIndex
+-- ,SUM(ps.Tariff) OVER (PARTITION BY DATENAME(MONTH,ps.AdmittedDate) ORDER BY ps.AdmittedDate) AS MonthToDateTariff
 FROM
 	PatientStay ps
 WHERE
@@ -183,17 +191,20 @@ ORDER BY
  * Running Total,resetting each month,alternative and simpler statement using WITH 
  */
 
-WITH cte
-AS (
-SELECT
-	ps.AdmittedDate
+WITH
+	cte
+	AS
+	(
+		SELECT
+			ps.AdmittedDate
 	,DATENAME(MONTH,ps.AdmittedDate) AS MonthAdmitted
 	,ps.Tariff
-FROM
-	PatientStay ps
-WHERE
+		FROM
+			PatientStay ps
+		WHERE
 	ps.Hospital = 'Oxleas'
-	AND ps.Ward = 'Dermatology')
+			AND ps.Ward = 'Dermatology'
+	)
 SELECT
 	cte.MonthAdmitted
 	,cte.AdmittedDate
@@ -225,17 +236,20 @@ WHERE
 Find the running total of the tariff by date for each hospital
 Firstly we must group by Hospital and Date in a CTE  
 */
-WITH cte
-AS (
-SELECT
-	ps.Hospital
+WITH
+	cte
+	AS
+	(
+		SELECT
+			ps.Hospital
 	,ps.AdmittedDate
 	,SUM(ps.Tariff) AS TotalTariff
-FROM
-	PatientStay ps
-GROUP BY
+		FROM
+			PatientStay ps
+		GROUP BY
 	ps.Hospital
-	,ps.AdmittedDate)
+	,ps.AdmittedDate
+	)
 SELECT
 	cte.Hospital
 	,cte.AdmittedDate
@@ -255,15 +269,24 @@ In the case of ties return the patient with the lowest PatientId.
 The CTE is necessary here since we cannot put a Window function into a WHERE clause
 **/
 
-WITH RankedPatient (PatientId,Hospital,Tariff,PatientRank)
-AS (
-SELECT
-	PatientId
+WITH
+	RankedPatient
+	(
+		PatientId
+		,Hospital
+		,Tariff
+		,PatientRank
+	)
+	AS
+	(
+		SELECT
+			PatientId
 	,Hospital
 	,Tariff
 	,ROW_NUMBER() OVER (PARTITION BY Hospital ORDER BY Tariff DESC,PatientId) AS PatientRank
-FROM
-	PatientStay)
+		FROM
+			PatientStay
+	)
 SELECT
 	rp.Hospital
 	,rp.PatientId
@@ -283,18 +306,21 @@ Using CTEs to break into simpler steps
 The WHERE clause is simply to return a small dataset of 4 patients,
 each with a different admitted date,to make the example easier to understand.
 */
-WITH cte
-AS (
-SELECT
-	 ps.AdmittedDate 
+WITH
+	cte
+	AS
+	(
+		SELECT
+			ps.AdmittedDate 
 	,ps.Tariff
 	,LEAD(ps.Tariff) OVER (ORDER BY ps.AdmittedDate) AS NextDayTariff
 	,LAG(ps.Tariff) OVER (ORDER BY ps.AdmittedDate) AS PreviousDayTariff
-FROM
-	PatientStay ps
-WHERE
+		FROM
+			PatientStay ps
+		WHERE
 	ps.Hospital = 'Oxleas'
-	AND ps.Ward = 'Dermatology')
+			AND ps.Ward = 'Dermatology'
+	)
 SELECT
 	cte.AdmittedDate
 	,cte.Tariff
